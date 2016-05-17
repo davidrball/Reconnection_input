@@ -1,0 +1,211 @@
+recon.inp
+{
+Starting by just setting up some initial magnetic fields and playing around with them
+}
+
+Variables
+{
+PI = 3.14159
+
+Brecon=.01 // for now
+
+
+
+
+
+  electronMass = 9.1094e-31 
+  electronCharge = -1.6022e-19
+  permit = 8.8542e-12 //permitivitty const.
+  speedLight = 2.9979e8
+  speedLight2 = speedLight*speedLight 
+  electronCharge2 = electronCharge*electronCharge 
+  qOverM = electronCharge/electronMass
+
+  ionCharge = -electronCharge
+  unitMassMKS = electronMass / 5.48579903e-04 
+  hydrogenMassNum = 1.00797
+  hydrogenMass = unitMassMKS * hydrogenMassNum *20.0
+
+//Grid parameters
+aspect_ratio = 5
+  Nx = 150 //number of grid points in x
+  Ny = Nx/aspect_ratio //number of grid points in y
+
+  Lx = 1e-4 //physical length in x
+  Ly = Lx/aspect_ratio //physical length in y
+
+  dx = Lx / Nx //length of grid cell in x
+  dy = Ly / Ny //length of grid cell in y
+
+  d = 1. / sqrt( 1./(dx*dx) + 1./(dy*dy) ) //
+  timeStep = 0.7 * d / speedLight
+
+  plasmaDensityMKS = 5.0e22
+  simulationVolume=Lx*Ly*.5
+  totalNumPlasma = plasmaDensityMKS * simulationVolume
+  numPtclsPerCell = 100
+  numCells = Nx * Ny * .5
+  numPlasmaPtcls = numPtclsPerCell * numCells
+  plasmaNumRatio = totalNumPlasma / numPlasmaPtcls
+
+
+
+
+//converting some things to CGS to calculate things in the same system as standard (e.g. Sironi)
+  conv_factor = 1e-6 //number density in mks to cgs
+  plasmaDensityCGS = plasmaDensityMKS * conv_factor 
+  speedLightCGS = 2.9979e10
+  speedLight2CGS = speedLightCGS*speedLightCGS
+  electronMassCGS = electronMass*1000.0
+  electronChargeCGS = 4.8032e-10 //statcoulombs
+  electronCharge2CGS = electronChargeCGS*electronChargeCGS
+  KbCGS = 1.3806e-16 //Boltzmann's constant in CGS
+
+
+//we want to characterize all of the reconnection properties similar to Sironi & spitkovsky:
+//all of the following is for a pair plasma, the formalism we use here will break down in the case of a ion-electron plasma
+
+//Parameters of our choice:
+
+//Sigma = 10.0 
+//Plasma density, given above
+
+//temperature of plasma OUTSIDE the current sheet, Sironi uses: Kb*Tc/mc^2 = 1e-4
+//thermal pressure in the sheet must balance magnetic pressure outside
+//need overdensity in the current sheet, factor we call "eta"
+//pressure balance dictates that the temperature in the current sheet is given by:
+//Kb*Th/mc^2 = sigma/(2*eta) i.e. the more dense the current sheet, the less hot it has to be to support against magnetic pressure
+
+//Setting eta and the temperatures:
+//Tc = 1.0e-4 * speedLight2CGS * electronMassCGS / KbCGS
+//eta = 3.0 //factor by which plasma in the current sheet is overdense
+//Th = (Sigma/(2.0*eta))* speedLight2CGS * electronMassCGS / KbCGS
+
+
+
+//wp = sqrt(4*PI*plasmaDensityCGS*electronCharge2CGS / electronMassCGS) //plasma frequency
+//skindepthCGS = speedLightCGS/wp //skin depth
+//skindepthMKS = skindepthCGS*100.0 
+//want to resolve the skin depth in 10 or so cells
+//xresCGS = skindepthCGS/10.0
+//xresMKS = skindepthMKS/10.0 //physical grid spacing
+
+//width of current sheet: 20 skin depths:
+//LreconCGS=20.0*skindepthCGS
+//LreconMKS=20.0*skindepthMKS
+
+
+//wc = 2*PI / (sqrt(Sigma)*wp) // larmoor frequency
+//want to resolve the larmoor frequency in a few timesteps:
+//TimeStep = wc/3.0
+
+
+//BreconGAUSS = sqrt(Sigma*4*PI*electronMassCGS*speedLight2CGS*plasmaDensityCGS)//in Gauss
+//BreconTESLA = BreconGAUSS*1e-4 
+//plasma skin depth is c/wp where wp = sqrt(4 pi n e^2 /m) (plasma frequency) 
+
+
+Lrecon=Ly/20.0 //sets half-width of current sheet
+}
+
+Region
+{
+Grid
+{
+J=Nx
+x1s = -Lx/2.0
+x1f = Lx/2.0
+n1=1.0
+
+K=Ny
+x2s = -Ly/2.0
+x2f = Ly/2.0
+n2=1.0
+Geometry=1
+}
+Control
+{
+dt = timeStep
+emdamping = 0.05
+CurrentWeighting=1
+
+B1init=Brecon*(1-exp(-2*(x2/Lrecon)))/(1+exp(-2*(x2/Lrecon))) //tanh(x2/L) w/ asymptotic field strength of .01 Tesla
+}
+
+Species
+{
+name=electrons
+m=electronMass
+q=electronCharge
+}
+Species
+{
+name = positrons
+m=electronMass
+q = -electronCharge
+}
+
+Load
+{
+speciesName=electrons
+density = plasmaDensityMKS
+temperature=1e-9
+x1MinMKS=-Lx
+x1MaxMKS= Lx
+
+x2MinMKS= -Ly
+x2MaxMKS= Ly
+np2c = plasmaNumRatio
+}
+Load
+{
+speciesName=positrons
+density = plasmaDensityMKS
+temperature=1e-9
+x1MinMKS=-Lx
+x1MaxMKS= Lx
+
+x2MinMKS= -Ly
+x2MaxMKS= Ly
+np2c = plasmaNumRatio
+}
+
+Conductor
+{
+j1=0
+k1=Ny
+j2=Nx
+k2=Ny
+normal=-1 
+
+}
+Conductor
+{
+j1=0
+k1=0
+j2=0
+k2=Ny
+normal = 1
+
+}
+Conductor
+{
+j1=0
+k1=0
+j2=Nx
+k2=0
+normal=1
+
+}
+Conductor
+{
+j1=Nx
+k1=0
+j2=Nx
+k2=Ny
+normal=-1
+
+}
+
+
+}
